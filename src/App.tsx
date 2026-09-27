@@ -1,15 +1,13 @@
-import { useMemo, useState, type FormEvent } from 'react';
-import { ArrowDown, Lightbulb, Minus, Music2, Plus, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ArrowDown, ChevronDown, Lightbulb, Minus, Music2, Plus } from 'lucide-react';
 import {
   arrangeProgression,
   noteName,
   parseChordList,
-  suggestedFingers,
   type Chord,
   type ProgressionItem,
 } from './chords';
 
-type Hand = 'right' | 'left';
 type ChordColor = { name: string; pale: string; main: string; ink: string; line: string };
 
 const palette: ChordColor[] = [
@@ -37,17 +35,57 @@ function colorAt(index: number): ChordColor {
 
 const example = 'C  G  Am  F  C  G  F  C';
 
-function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[]; color: ChordColor }) {
-  const active = new Map<number, number>();
-  notes.forEach((note, index) => active.set(note, fingers[index]));
+function normalizeFileUrl(value: string): string {
+  const input = value.trim();
+  const url = new URL(/^https?:\/\//i.test(input) ? input : `https://${input}`);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Use an http or https file URL.');
+  if (url.hostname === 'github.com') {
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length >= 5 && ['blob', 'raw'].includes(parts[2])) {
+      const [owner, repo, , branch, ...filePath] = parts;
+      return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath.join('/')}${url.search}`;
+    }
+  }
+  if (url.hostname === 'gist.github.com') url.hostname = 'gist.githubusercontent.com';
+  return url.href;
+}
+
+function Keyboard({ notes, color }: { notes: number[]; color: ChordColor }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.round(entry.contentRect.width);
+      setContainerWidth((current) => current === width ? current : width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const availableWidth = containerWidth || (typeof window === 'undefined' ? 1200 : Math.max(240, window.innerWidth - 110));
+  const trimmedOctaves = availableWidth >= 1040 ? 0 : availableWidth >= 600 ? 1 : 2;
+  const visibleKeyCount = 88 - trimmedOctaves * 24;
+  const maximumStart = 108 - visibleKeyCount + 1;
+  let firstMidi = 21 + trimmedOctaves * 12;
+  let lastMidi = firstMidi + visibleKeyCount - 1;
+  if (notes.length && (Math.min(...notes) < firstMidi || Math.max(...notes) > lastMidi)) {
+    const wantedStart = (Math.min(...notes) + Math.max(...notes) - visibleKeyCount + 1) / 2;
+    const octaveOffset = Math.max(0, Math.min((maximumStart - 21) / 12, Math.round((wantedStart - 21) / 12)));
+    firstMidi = 21 + octaveOffset * 12;
+    lastMidi = firstMidi + visibleKeyCount - 1;
+  }
   const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
-  const whiteWidth = 22;
-  const blackWidth = 14;
-  const width = whiteWidth * 52;
+  const whiteNoteCount = Array.from({ length: lastMidi - firstMidi + 1 }, (_, index) => firstMidi + index)
+    .filter((midi) => whitePitchClasses.has(midi % 12)).length;
+  const width = Math.max(1, availableWidth);
+  const whiteWidth = width / whiteNoteCount;
+  const blackWidth = whiteWidth * 0.64;
   const whiteKeys: Array<{ midi: number; x: number }> = [];
   const blackKeys: Array<{ midi: number; x: number }> = [];
   let whiteIndex = 0;
-  for (let midi = 21; midi <= 108; midi += 1) {
+  for (let midi = firstMidi; midi <= lastMidi; midi += 1) {
     if (whitePitchClasses.has(midi % 12)) {
       whiteKeys.push({ midi, x: whiteIndex * whiteWidth });
       whiteIndex += 1;
@@ -58,14 +96,13 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
 
   const noteLabel = (midi: number) => noteName(midi);
   return (
-    <div className="keyboard-scroll" role="img" tabIndex={0} aria-label={`88-key piano with ${notes.map(noteLabel).join(', ')} highlighted`}>
-      <svg className="piano-svg" viewBox={`0 0 ${width} 86`} style={{ minWidth: `${width}px` }}>
+    <div ref={containerRef} className="keyboard-scroll" role="img" aria-label={`Piano excerpt ${noteLabel(firstMidi)} to ${noteLabel(lastMidi)} with ${notes.map(noteLabel).join(', ')} highlighted`}>
+      <svg className="piano-svg" viewBox={`0 0 ${width} 86`}>
         <g>
           {whiteKeys.map(({ midi, x }) => {
-            const finger = active.get(midi);
-            const isActive = active.has(midi);
+            const isActive = notes.includes(midi);
             const pitch = midi % 12;
-            const showLabel = isActive || pitch === 0 || midi === 21;
+            const showLabel = isActive || pitch === 0 || midi === firstMidi;
             return (
               <g key={midi}>
                 <rect
@@ -73,10 +110,6 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
                   fill={isActive ? color.pale : '#fff'}
                   stroke={isActive ? color.line : '#d9dfe3'} strokeWidth="1"
                 />
-                {isActive && <>
-                  <circle cx={x + whiteWidth / 2} cy="57" r="8" fill={color.main} />
-                  <text x={x + whiteWidth / 2} y="60.5" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>
-                </>}
                 {showLabel && <text x={x + whiteWidth / 2} y="78" textAnchor="middle" className={`key-label ${isActive ? 'key-label-active' : ''}`} fill={isActive ? color.ink : '#89939a'}>{noteLabel(midi)}</text>}
               </g>
             );
@@ -84,8 +117,7 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
         </g>
         <g>
           {blackKeys.map(({ midi, x }) => {
-            const finger = active.get(midi);
-            const isActive = active.has(midi);
+            const isActive = notes.includes(midi);
             return (
               <g key={midi}>
                 <rect
@@ -93,7 +125,6 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
                   fill={isActive ? color.main : '#27323a'}
                   stroke={isActive ? color.ink : '#27323a'} strokeWidth="1"
                 />
-                {isActive && <text x={x + blackWidth / 2} y="27" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>}
               </g>
             );
           })}
@@ -108,7 +139,6 @@ function ChordCard({
   index,
   notes,
   color,
-  hand,
   octaveShift,
   onShift,
 }: {
@@ -116,11 +146,9 @@ function ChordCard({
   index: number;
   notes: number[];
   color: ChordColor;
-  hand: Hand;
   octaveShift: number;
   onShift: (direction: number) => void;
 }) {
-  const fingers = suggestedFingers(notes, hand, chord.rootPc, chord.intervals);
   const displayNotes = notes.map(noteName);
   const bassPc = notes.length ? notes[0] % 12 : chord.rootPc;
   const originalSlashBass = chord.source.split('/')[1];
@@ -154,7 +182,7 @@ function ChordCard({
         </div>
       </div>
 
-      <Keyboard notes={notes} fingers={fingers} color={color} />
+      <Keyboard notes={notes} color={color} />
 
     </article>
   );
@@ -166,8 +194,13 @@ function App() {
   const [items, setItems] = useState<ProgressionItem[]>(initial.items);
   const chords = useMemo(() => items.flatMap((item) => item.type === 'chord' ? [item.chord] : []), [items]);
   const [octaveShifts, setOctaveShifts] = useState<number[]>(initial.chords.map(() => 0));
-  const [hand, setHand] = useState<Hand>('right');
   const [error, setError] = useState('');
+  const [loadMenuOpen, setLoadMenuOpen] = useState(false);
+  const [urlEntryOpen, setUrlEntryOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const notesByChord = useMemo(() => arrangeProgression(chords, octaveShifts), [chords, octaveShifts]);
   const colorByChord = useMemo(() => {
     const ids = [...new Set(chords.map((chord) => chord.id))];
@@ -175,30 +208,85 @@ function App() {
   }, [chords]);
   const uniqueCount = new Set(chords.map((chord) => chord.id)).size;
 
-  function applyProgression(event: FormEvent) {
-    event.preventDefault();
-    if (!text.trim()) {
+  function applyChordText(value: string, warnSkipped = true): boolean {
+    const cleanValue = value.replace(/^\uFEFF/, '');
+    setText(cleanValue);
+    if (!cleanValue.trim()) {
       setItems([]);
       setOctaveShifts([]);
       setError('');
-      return;
+      return true;
     }
-    const result = parseChordList(text);
+    const result = parseChordList(cleanValue);
     if (result.chords.length === 0) {
-      setError(`I couldn't read any chords. Try symbols like C, Am, F#m7, or Bb.`);
-      return;
+      setError(`I couldn't find any chords. Try symbols like C, Am, F#m7, or Bb.`);
+      return false;
     }
     setItems(result.items);
     setOctaveShifts(result.chords.map(() => 0));
-    setError(result.invalid.length ? `Skipped unrecognized ${result.invalid.length === 1 ? 'chord' : 'chords'}: ${result.invalid.join(', ')}` : '');
+    setError(warnSkipped && result.invalid.length ? `Skipped unrecognized ${result.invalid.length === 1 ? 'chord' : 'chords'}: ${result.invalid.join(', ')}` : '');
+    return true;
+  }
+
+  function applyProgression(event: FormEvent) {
+    event.preventDefault();
+    applyChordText(text);
   }
 
   function loadExample() {
-    setText(example);
-    const parsed = parseChordList(example);
-    setItems(parsed.items);
-    setOctaveShifts(parsed.chords.map(() => 0));
+    applyChordText(example);
+    setLoadMenuOpen(false);
+    setUrlEntryOpen(false);
+  }
+
+  async function loadLocalFile(file: File) {
+    setIsLoading(true);
     setError('');
+    try {
+      const contents = await file.text();
+      if (contents.length > 1_000_000) throw new Error('Please use a chord file smaller than 1 MB.');
+      if (applyChordText(contents, false)) {
+        setLoadMenuOpen(false);
+        setUrlEntryOpen(false);
+      }
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'Could not read that file.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function loadFromUrl() {
+    if (!urlInput.trim()) {
+      setError('Enter a file URL first.');
+      return;
+    }
+    setIsLoading(true);
+    setError('');
+    try {
+      const response = await fetch(normalizeFileUrl(urlInput));
+      if (!response.ok) throw new Error(`The file request failed (${response.status}).`);
+      const contentType = response.headers.get('content-type') ?? '';
+      if (contentType.includes('text/html')) throw new Error('That link returned a web page. Use a GitHub file link or its raw URL.');
+      const contents = await response.text();
+      if (contents.length > 1_000_000) throw new Error('Please use a chord file smaller than 1 MB.');
+      if (applyChordText(contents, false)) {
+        setLoadMenuOpen(false);
+        setUrlEntryOpen(false);
+        setUrlInput('');
+      }
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'Could not load that URL.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function handleFileDrop(event: React.DragEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file) void loadLocalFile(file);
   }
 
   function shiftOctave(index: number, direction: number) {
@@ -217,12 +305,18 @@ function App() {
         <a className="header-link" href="#how-it-works">How to use <ArrowDown size={14} /></a>
       </header>
 
-      <section className="hero" id="top">
-        <div className="eyebrow"><span className="eyebrow-dot" /> YOUR CHORDS, MADE PLAYABLE</div>
-        <h1>See the chords.<br /><span>Find the keys.</span></h1>
-        <p className="hero-copy">Paste in a song’s chords and follow along, one shape at a time. No sheet music or piano experience needed.</p>
-
-        <form className="input-panel" onSubmit={applyProgression}>
+      <section className="progression-input-section" id="top">
+        <form
+          className={`input-panel ${isDragging ? 'dragging' : ''}`}
+          onSubmit={applyProgression}
+          onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(event) => {
+            const next = event.relatedTarget;
+            if (next instanceof Node && event.currentTarget.contains(next)) return;
+            setIsDragging(false);
+          }}
+          onDrop={handleFileDrop}
+        >
           <label htmlFor="chord-input">YOUR CHORD PROGRESSION</label>
           <textarea
             id="chord-input"
@@ -233,9 +327,45 @@ function App() {
             spellCheck={false}
           />
           <div className="input-bottom">
-            <span className="input-hint">Use C/G for an explicit inversion; [Verse] labels and new lines add separators</span>
+            <span className="input-hint">{isDragging ? 'Drop the chord text file to load it' : 'Use [Verse] for a label; new lines add separators · drop a chord file to load it'}</span>
             <div className="input-actions">
-              <button className="example-button" type="button" onClick={loadExample}><RotateCcw size={14} /> Load example</button>
+              <div className="load-menu-wrap">
+                <button className="load-button" type="button" aria-expanded={loadMenuOpen} onClick={() => setLoadMenuOpen((open) => !open)}>
+                  Load <ChevronDown size={14} />
+                </button>
+                {loadMenuOpen && <div className="load-popover">
+                  <button className="load-option" type="button" onClick={loadExample}>Example progression</button>
+                  <div className="url-load-option">
+                    <button className="load-option" type="button" onClick={() => setUrlEntryOpen((open) => !open)}>From a URL…</button>
+                    {urlEntryOpen && <div className="url-load-form">
+                      <label htmlFor="source-url">Chord file URL</label>
+                      <input
+                        id="source-url"
+                        type="text"
+                        value={urlInput}
+                        onChange={(event) => setUrlInput(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void loadFromUrl(); } }}
+                        placeholder="github.com/user/repo/blob/main/song.txt"
+                      />
+                      <button className="load-url-button" type="button" onClick={() => void loadFromUrl()} disabled={isLoading}>
+                        {isLoading ? 'Loading…' : 'Load file'}
+                      </button>
+                    </div>}
+                  </div>
+                  <button className="load-option" type="button" onClick={() => fileInputRef.current?.click()}>Local file…</button>
+                  <input
+                    ref={fileInputRef}
+                    className="visually-hidden"
+                    type="file"
+                    accept=".txt,.md,.pro,.cho,.chordpro,.csv,text/plain"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void loadLocalFile(file);
+                      event.target.value = '';
+                    }}
+                  />
+                </div>}
+              </div>
               <button className="show-button" type="submit">Show my chords <span aria-hidden="true">→</span></button>
             </div>
           </div>
@@ -245,16 +375,7 @@ function App() {
 
       <section className="guide-section" aria-label="Your piano chord guide">
         <div className="guide-heading">
-          <div>
-            <div className="section-kicker">YOUR PLAYING GUIDE</div>
-            <h2>Follow the colors down</h2>
-            <p>Each row is one chord. The highlighted keys show exactly what to press.</p>
-          </div>
           <div className="guide-tools">
-            <div className="hand-picker" aria-label="Choose playing hand">
-              <button type="button" className={hand === 'right' ? 'selected' : ''} onClick={() => setHand('right')}>Right hand</button>
-              <button type="button" className={hand === 'left' ? 'selected' : ''} onClick={() => setHand('left')}>Left hand</button>
-            </div>
             <span className="sequence-count">{chords.length} {chords.length === 1 ? 'chord' : 'chords'} <i /> {uniqueCount} {uniqueCount === 1 ? 'color' : 'colors'}</span>
           </div>
         </div>
@@ -273,7 +394,6 @@ function App() {
                   index={item.chordIndex}
                   notes={notesByChord[item.chordIndex] ?? []}
                   color={colorByChord.get(item.chord.id) ?? palette[0]}
-                  hand={hand}
                   octaveShift={octaveShifts[item.chordIndex] ?? 0}
                   onShift={(direction) => shiftOctave(item.chordIndex, direction)}
                 />
@@ -288,8 +408,7 @@ function App() {
         <div>
           <h3>A couple of things to know</h3>
           <p><strong>Matching colors mean matching chords.</strong> Your hand moves to a new position for each row; keep the notes in that chord pressed together.</p>
-          <p><strong>Finger numbers are suggestions:</strong> 1 is your thumb and 5 is your pinky. They’re a simple starting point, not a strict rule. Use the octave buttons if a shape feels more comfortable higher or lower.</p>
-          <p className="method-note">Chords start in root position near middle C. Use slash chords like C/G to specify a different bass note; other chords are placed as close as possible to the previous shape. Suggested fingerings are basic one-hand starting points.</p>
+          <p className="method-note">Chords start in root position near middle C. Use slash chords like C/G to specify a different bass note; other chords are placed as close as possible to the previous shape.</p>
         </div>
       </section>
 

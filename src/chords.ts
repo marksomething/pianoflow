@@ -97,7 +97,10 @@ export function parseChordList(input: string): { chords: Chord[]; items: Progres
   for (const match of tokens) {
     const token = match[0];
     const tokenStart = match.index ?? 0;
-    const isSection = token.startsWith('[') && token.endsWith(']');
+    const isBracketed = token.startsWith('[') && token.endsWith(']');
+    const bracketText = isBracketed ? token.slice(1, -1).trim() : '';
+    const bracketedChord = bracketText ? parseChord(bracketText) : undefined;
+    const isSection = isBracketed && !bracketedChord;
     const gap = input.slice(previousTokenEnd, tokenStart);
     if (hasPreviousToken && /[\r\n]/.test(gap) && !previousTokenWasSection && !isSection) {
       items.push({ type: 'separator' });
@@ -106,12 +109,11 @@ export function parseChordList(input: string): { chords: Chord[]; items: Progres
     previousTokenWasSection = isSection;
     hasPreviousToken = true;
     if (isSection) {
-      const title = token.slice(1, -1).trim();
-      if (title) items.push({ type: 'section', title });
+      if (bracketText) items.push({ type: 'section', title: bracketText });
       else invalid.push(token);
       continue;
     }
-    const chord = parseChord(token);
+    const chord = bracketedChord ?? parseChord(token);
     if (chord) {
       const chordIndex = chords.length;
       chords.push(chord);
@@ -247,19 +249,3 @@ export function arrangeProgression(chords: Chord[], octaveShifts: number[]): num
   return bestSequence(adjustedCandidates);
 }
 
-export function suggestedFingers(notes: number[], hand: 'right' | 'left', rootPc: number, intervals: number[]): number[] {
-  const right: Record<number, number[]> = {
-    1: [1], 2: [1, 5], 3: [1, 3, 5], 4: [1, 2, 3, 5], 5: [1, 2, 3, 4, 5],
-  };
-  const left: Record<number, number[]> = {
-    1: [1], 2: [5, 1], 3: [5, 3, 1], 4: [5, 4, 2, 1], 5: [5, 4, 3, 2, 1],
-  };
-  const count = Math.max(1, Math.min(5, notes.length));
-  if (notes.length === 3) {
-    const bassInterval = ((notes[0] % 12) - rootPc + 12) % 12;
-    const inversion = intervals.map((interval) => interval % 12).indexOf(bassInterval);
-    // A third-in-the-bass triad is often more comfortable with fingers 1-2-5 (mirrored for LH).
-    if (inversion === 1) return hand === 'right' ? [1, 2, 5] : [5, 4, 1];
-  }
-  return (hand === 'right' ? right : left)[count];
-}
