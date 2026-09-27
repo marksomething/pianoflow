@@ -165,37 +165,86 @@ function chordCandidates(chord: Chord, inversionIndex: number): number[][] {
   return candidates;
 }
 
-function closeness(a: number[], b: number[]): number {
-  const nearestDistance = (from: number[], to: number[]) => from.reduce((sum, note) => {
-    return sum + Math.min(...to.map((other) => Math.abs(note - other)));
-  }, 0);
-  const spacingPenalty = Math.max(0, (Math.max(...a) - Math.min(...a)) - 19) * 0.8;
-  return nearestDistance(a, b) + nearestDistance(b, a) + spacingPenalty;
+function voiceLeadingCost(from: number[], to: number[]): number {
+  const unmatchedVoiceCost = 10;
+  const costs = Array.from({ length: from.length + 1 }, () => Array(to.length + 1).fill(Number.POSITIVE_INFINITY));
+  costs[0][0] = 0;
+
+  for (let i = 0; i <= from.length; i += 1) {
+    for (let j = 0; j <= to.length; j += 1) {
+      const current = costs[i][j];
+      if (!Number.isFinite(current)) continue;
+      if (i < from.length && j < to.length) {
+        const leap = Math.abs(from[i] - to[j]);
+        const moveCost = leap + Math.max(0, leap - 7) * 0.7;
+        costs[i + 1][j + 1] = Math.min(costs[i + 1][j + 1], current + moveCost);
+      }
+      if (i < from.length) costs[i + 1][j] = Math.min(costs[i + 1][j], current + unmatchedVoiceCost);
+      if (j < to.length) costs[i][j + 1] = Math.min(costs[i][j + 1], current + unmatchedVoiceCost);
+    }
+  }
+  return costs[from.length][to.length];
+}
+
+function registerCost(notes: number[]): number {
+  const center = notes.reduce((sum, note) => sum + note, 0) / notes.length;
+  const span = Math.max(...notes) - Math.min(...notes);
+  return Math.abs(center - 64) * 1.2 + Math.max(0, span - 12) * 2;
+}
+
+function bestSequence(candidateGroups: number[][][]): number[][] {
+  if (candidateGroups.length === 0) return [];
+  if (candidateGroups.some((group) => group.length === 0)) return candidateGroups.map(() => []);
+
+  const scores = candidateGroups.map((group) => group.map(() => Number.POSITIVE_INFINITY));
+  const previousChoices = candidateGroups.map((group) => group.map(() => -1));
+  for (let candidate = 0; candidate < candidateGroups[0].length; candidate += 1) {
+    scores[0][candidate] = registerCost(candidateGroups[0][candidate]) * 2;
+  }
+
+  for (let chordIndex = 1; chordIndex < candidateGroups.length; chordIndex += 1) {
+    const previousGroup = candidateGroups[chordIndex - 1];
+    const currentGroup = candidateGroups[chordIndex];
+    for (let current = 0; current < currentGroup.length; current += 1) {
+      const currentNotes = currentGroup[current];
+      for (let previous = 0; previous < previousGroup.length; previous += 1) {
+        const score = scores[chordIndex - 1][previous]
+          + voiceLeadingCost(previousGroup[previous], currentNotes)
+          + registerCost(currentNotes) * 0.8;
+        if (score < scores[chordIndex][current]) {
+          scores[chordIndex][current] = score;
+          previousChoices[chordIndex][current] = previous;
+        }
+      }
+    }
+  }
+
+  let best = 0;
+  const finalScores = scores[scores.length - 1];
+  for (let candidate = 1; candidate < finalScores.length; candidate += 1) {
+    if (finalScores[candidate] < finalScores[best]) best = candidate;
+  }
+  const path = Array.from({ length: candidateGroups.length }, () => [] as number[]);
+  for (let chordIndex = candidateGroups.length - 1; chordIndex >= 0; chordIndex -= 1) {
+    path[chordIndex] = candidateGroups[chordIndex][best];
+    best = previousChoices[chordIndex][best];
+  }
+  return path;
 }
 
 export function arrangeProgression(chords: Chord[], octaveShifts: number[]): number[][] {
-  let previous: number[] | undefined;
-  return chords.map((chord, index) => {
-    const targetOctaveShift = (octaveShifts[index] ?? 0) * 12;
-    const candidates = chordCandidates(chord, defaultInversionIndex(chord)).filter((candidate) => candidate.every((note) => note + targetOctaveShift >= 21 && note + targetOctaveShift <= 108));
-    if (candidates.length === 0) return [];
-    let selected = candidates[0];
-    let bestScore = Number.POSITIVE_INFINITY;
-    for (const candidate of candidates) {
-      const score = previous
-        ? closeness(candidate, previous)
-        : Math.abs(candidate.reduce((sum, note) => sum + note, 0) / candidate.length - 60) * 2
-          + (Math.max(...candidate) - Math.min(...candidate)) * 0.2
-          + (candidate[0] % 12 === chord.rootPc ? 0 : 8);
-      if (score < bestScore) {
-        bestScore = score;
-        selected = candidate;
-      }
-    }
-    const actual = selected.map((note) => note + targetOctaveShift);
-    previous = actual;
-    return actual;
+  const candidateGroups = chords.map((chord) => chordCandidates(chord, defaultInversionIndex(chord)));
+  const baseline = bestSequence(candidateGroups);
+  if (!octaveShifts.some((shift) => shift !== 0)) return baseline;
+
+  // Octave edits pin that chord relative to the unedited best path; other chords can then revoice around it.
+  const adjustedCandidates = candidateGroups.map((group, index) => {
+    const shift = octaveShifts[index] ?? 0;
+    if (shift === 0) return group;
+    const adjusted = baseline[index].map((note) => note + shift * 12);
+    return adjusted.length > 0 && adjusted.every((note) => note >= 21 && note <= 108) ? [adjusted] : group;
   });
+  return bestSequence(adjustedCandidates);
 }
 
 export function suggestedFingers(notes: number[], hand: 'right' | 'left', rootPc: number, intervals: number[]): number[] {
