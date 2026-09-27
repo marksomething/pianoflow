@@ -8,9 +8,12 @@ export type Chord = {
   id: string;
 };
 
+export type LyricMarker = { chordIndex: number; column: number };
+
 export type ProgressionItem =
   | { type: 'section'; title: string }
   | { type: 'separator' }
+  | { type: 'lyrics'; text: string; markers: LyricMarker[] }
   | { type: 'chord'; chord: Chord; chordIndex: number };
 
 const pitchClasses: Record<string, number> = {
@@ -85,6 +88,55 @@ export function parseChord(source: string): Chord | undefined {
     slashPc: bass,
     id,
   };
+}
+
+export function parseChordSheet(input: string): { chords: Chord[]; items: ProgressionItem[]; invalid: string[] } {
+  const chords: Chord[] = [];
+  const items: ProgressionItem[] = [];
+  const lines = input.replace(/\r\n?/g, '\n').split('\n');
+  let pendingMarkers: LyricMarker[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      const previous = items[items.length - 1];
+      if (pendingMarkers.length === 0 && previous && previous.type !== 'section' && previous.type !== 'separator') {
+        items.push({ type: 'separator' });
+      }
+      continue;
+    }
+
+    const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch && !parseChord(sectionMatch[1].trim())) {
+      items.push({ type: 'section', title: sectionMatch[1].trim() });
+      pendingMarkers = [];
+      continue;
+    }
+
+    const tokens = [...line.matchAll(/\S+/g)];
+    const rowChords = tokens.map((match) => {
+      const raw = match[0];
+      const symbol = raw.startsWith('[') && raw.endsWith(']') ? raw.slice(1, -1) : raw.replace(/^[,|;]+|[,|;]+$/g, '');
+      return { chord: parseChord(symbol), column: match.index ?? 0 };
+    });
+    if (rowChords.length > 0 && rowChords.every((item) => item.chord !== undefined)) {
+      const newMarkers: LyricMarker[] = [];
+      for (const item of rowChords) {
+        const chord = item.chord!;
+        const chordIndex = chords.length;
+        chords.push(chord);
+        items.push({ type: 'chord', chord, chordIndex });
+        newMarkers.push({ chordIndex, column: item.column });
+      }
+      pendingMarkers = [...pendingMarkers, ...newMarkers];
+      continue;
+    }
+
+    items.push({ type: 'lyrics', text: line.replace(/\s+$/, ''), markers: pendingMarkers });
+    pendingMarkers = [];
+  }
+
+  return { chords, items, invalid: [] };
 }
 
 export function parseChordList(input: string): { chords: Chord[]; items: ProgressionItem[]; invalid: string[] } {

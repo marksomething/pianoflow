@@ -67,6 +67,16 @@ h1, h2, h3, p { margin-top: 0; }
 .progression-section { display: flex; align-items: center; gap: 12px; padding: 3px 4px; color: #5d7164; font-size: 10px; font-weight: 700; letter-spacing: .8px; }
 .progression-section::before, .progression-section::after { content: ''; flex: 1; height: 2px; background: #c5d0c7; }
 .progression-separator { height: 2px; margin: 2px 8px 0; background: #b9c7bd; border-radius: 1px; }
+.lyric-phrase-boundary { min-width: 0; padding: 3px 10px 10px; overflow: hidden; background: #fff; border: 1px solid #e5e9e4; border-radius: 12px; box-shadow: 0 3px 8px #1b31220a; }
+.lyric-phrase-keyboards { display: flex; flex-direction: column; }
+.lyric-phrase-keyboards .chord-card { padding: 7px 2px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.lyric-phrase-keyboards .chord-card + .chord-card { border-top: 1px solid #eff1ed; }
+.lyrics-line { margin: 8px 2px 0; padding: 8px 10px; color: #4e5d54; background: #f1f4ef; border-left: 3px solid #cad8cc; border-radius: 0 7px 7px 0; }
+.lyrics-line.has-markers { padding-top: 24px; }
+.lyrics-text { margin: 0; overflow-wrap: anywhere; color: #4e5d54; font: 500 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.lyrics-anchor { position: relative; display: inline-block; white-space: nowrap; }
+.lyrics-marker-stack { position: absolute; z-index: 1; bottom: calc(100% + 2px); left: 50%; display: flex; gap: 2px; transform: translateX(-50%); }
+.lyrics-marker { display: grid; width: 18px; height: 18px; flex: 0 0 18px; place-items: center; border: 1px solid; border-radius: 50%; font-size: 8px; font-weight: 700; }
 .chord-card { min-width: 0; padding: 7px 14px; overflow: hidden; background: #fff; border: 1px solid #e5e9e4; border-radius: 12px; box-shadow: 0 3px 8px #1b31220a; }
 .card-topline { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .step-marker { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; color: #a0aaa4; font: 600 9px 'Manrope', sans-serif; }

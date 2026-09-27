@@ -4,6 +4,7 @@ import {
   arrangeProgression,
   noteName,
   parseChordList,
+  parseChordSheet,
   type Chord,
   type ProgressionItem,
 } from './chords';
@@ -188,6 +189,56 @@ function ChordCard({
   );
 }
 
+function LyricsLine({
+  item,
+  chords,
+  colorByChord,
+}: {
+  item: Extract<ProgressionItem, { type: 'lyrics' }>;
+  chords: Chord[];
+  colorByChord: Map<string, ChordColor>;
+}) {
+  const words = [...item.text.matchAll(/\S+/g)];
+  const markersByWord = new Map<number, typeof item.markers>();
+  for (const marker of item.markers) {
+    let wordIndex = words.findIndex((word) => (word.index ?? 0) >= marker.column);
+    if (wordIndex < 0) wordIndex = Math.max(0, words.length - 1);
+    markersByWord.set(wordIndex, [...(markersByWord.get(wordIndex) ?? []), marker]);
+  }
+
+  const textParts: React.ReactNode[] = [];
+  let cursor = 0;
+  words.forEach((word, wordIndex) => {
+    const start = word.index ?? cursor;
+    textParts.push(item.text.slice(cursor, start));
+    const markers = markersByWord.get(wordIndex) ?? [];
+    if (markers.length > 0) {
+      textParts.push(
+        <span key={`anchored-word-${wordIndex}`} className="lyrics-anchor">
+          <span className="lyrics-marker-stack" aria-hidden="true">
+            {markers.map(({ chordIndex, column }) => {
+              const chord = chords[chordIndex];
+              const color = colorByChord.get(chord?.id ?? '') ?? palette[0];
+              return <span key={`${chordIndex}-${column}`} className="lyrics-marker" style={{ background: color.pale, color: color.ink, borderColor: color.line }}>{String(chordIndex + 1).padStart(2, '0')}</span>;
+            })}
+          </span>
+          {word[0]}
+        </span>,
+      );
+    } else {
+      textParts.push(word[0]);
+    }
+    cursor = start + word[0].length;
+  });
+  textParts.push(item.text.slice(cursor));
+
+  return (
+    <div className={`lyrics-line ${item.markers.length > 0 ? 'has-markers' : ''}`}>
+      <p className="lyrics-text">{textParts}</p>
+    </div>
+  );
+}
+
 function App() {
   const initial = parseChordList(example);
   const [text, setText] = useState(example);
@@ -195,6 +246,7 @@ function App() {
   const chords = useMemo(() => items.flatMap((item) => item.type === 'chord' ? [item.chord] : []), [items]);
   const [octaveShifts, setOctaveShifts] = useState<number[]>(initial.chords.map(() => 0));
   const [error, setError] = useState('');
+  const [lyricsMode, setLyricsMode] = useState(false);
   const [loadMenuOpen, setLoadMenuOpen] = useState(false);
   const [urlEntryOpen, setUrlEntryOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -208,6 +260,27 @@ function App() {
     return new Map(ids.map((id, index) => [id, colorAt(index)]));
   }, [chords]);
   const uniqueCount = new Set(chords.map((chord) => chord.id)).size;
+  const progressionBlocks = useMemo(() => {
+    const blocks: ProgressionItem[][] = [];
+    let pending: ProgressionItem[] = [];
+    const flush = () => {
+      if (pending.length) blocks.push(pending);
+      pending = [];
+    };
+    for (const item of items) {
+      if (item.type === 'chord') {
+        if (pending.some((entry) => entry.type === 'lyrics')) flush();
+        pending.push(item);
+      } else if (item.type === 'lyrics' && pending.some((entry) => entry.type === 'chord')) {
+        pending.push(item);
+      } else {
+        flush();
+        blocks.push([item]);
+      }
+    }
+    flush();
+    return blocks;
+  }, [items]);
 
   function clearInputTimer() {
     if (inputTimerRef.current !== null) {
@@ -223,16 +296,18 @@ function App() {
     if (!cleanValue.trim()) {
       setItems([]);
       setOctaveShifts([]);
+      setLyricsMode(false);
       setError('');
       return true;
     }
-    const result = parseChordList(cleanValue);
+    const result = warnSkipped ? parseChordList(cleanValue) : parseChordSheet(cleanValue);
     if (result.chords.length === 0) {
       setError(result.invalid.length ? `Couldn't parse any chords: ${result.invalid.join(', ')}` : `I couldn't find any chords. Try symbols like C, Am, F#m7, or Bb.`);
       return false;
     }
     setItems(result.items);
     setOctaveShifts(result.chords.map(() => 0));
+    setLyricsMode(result.items.some((item) => item.type === 'lyrics'));
     setError(warnSkipped && result.invalid.length ? `Couldn't parse: ${result.invalid.join(', ')}` : '');
     return true;
   }
@@ -330,7 +405,7 @@ function App() {
               clearInputTimer();
               inputTimerRef.current = window.setTimeout(() => {
                 inputTimerRef.current = null;
-                applyChordText(value);
+                applyChordText(value, !lyricsMode);
               }, 350);
             }}
             placeholder="Try: C  G  Am  F"
@@ -394,20 +469,35 @@ function App() {
           <div className="empty-state"><Music2 size={22} /><h3>Your guide will appear here</h3><p>Add a few chord names above to build your piano map.</p></div>
         ) : (
           <div className="progression-list">
-            {items.map((item, index) => {
-              if (item.type === 'section') return <div className="progression-section" key={`section-${index}`}><span>{item.title}</span></div>;
-              if (item.type === 'separator') return <div className="progression-separator" key={`separator-${index}`} aria-hidden="true" />;
-              return (
-                <ChordCard
-                  key={`${item.chord.source}-${item.chordIndex}`}
-                  chord={item.chord}
-                  index={item.chordIndex}
-                  notes={notesByChord[item.chordIndex] ?? []}
-                  color={colorByChord.get(item.chord.id) ?? palette[0]}
-                  octaveShift={octaveShifts[item.chordIndex] ?? 0}
-                  onShift={(direction) => shiftOctave(item.chordIndex, direction)}
-                />
-              );
+            {progressionBlocks.map((block, blockIndex) => {
+              const blockChords = block.filter((item): item is Extract<ProgressionItem, { type: 'chord' }> => item.type === 'chord');
+              const blockLyrics = block.filter((item): item is Extract<ProgressionItem, { type: 'lyrics' }> => item.type === 'lyrics');
+              const key = `block-${blockIndex}`;
+              if (blockChords.length > 0) {
+                const cards = blockChords.map((item) => (
+                  <ChordCard
+                    key={`${item.chord.source}-${item.chordIndex}`}
+                    chord={item.chord}
+                    index={item.chordIndex}
+                    notes={notesByChord[item.chordIndex] ?? []}
+                    color={colorByChord.get(item.chord.id) ?? palette[0]}
+                    octaveShift={octaveShifts[item.chordIndex] ?? 0}
+                    onShift={(direction) => shiftOctave(item.chordIndex, direction)}
+                  />
+                ));
+                if (blockLyrics.length > 0) return (
+                  <div className="lyric-phrase-boundary" key={key}>
+                    <div className="lyric-phrase-keyboards">{cards}</div>
+                    {blockLyrics.map((item, index) => <LyricsLine key={`${key}-lyrics-${index}`} item={item} chords={chords} colorByChord={colorByChord} />)}
+                  </div>
+                );
+                return cards;
+              }
+              const item = block[0];
+              if (item.type === 'section') return <div className="progression-section" key={key}><span>{item.title}</span></div>;
+              if (item.type === 'separator') return <div className="progression-separator" key={key} aria-hidden="true" />;
+              if (item.type === 'lyrics') return <LyricsLine key={key} item={item} chords={chords} colorByChord={colorByChord} />;
+              return null;
             })}
           </div>
         )}
