@@ -74,7 +74,8 @@ export function parseChord(source: string): Chord | undefined {
   const bass = slashMatch ? pitchClass(slashMatch[2]) : undefined;
   if (rootPc === undefined || !parsedFormula || (slashMatch && bass === undefined)) return undefined;
   const normalizedIntervals = [...parsedFormula.intervals].map((n) => n % 12).sort((a, b) => a - b);
-  const id = `${rootPc}:${[...new Set(normalizedIntervals)].join('.')}`;
+  const bassIdentity = bass ?? rootPc;
+  const id = `${rootPc}:${parsedFormula.quality}:${[...new Set(normalizedIntervals)].join('.')}:bass-${bassIdentity}`;
   return {
     source: token,
     root,

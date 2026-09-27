@@ -5,14 +5,17 @@ Notable changes to PianoFlow are recorded here.
 ## [1.1.0] - 2026-09-27
 
 ### Added
-- Load the built-in example, public chord-text URLs, or local files; local files can also be drag-and-dropped.
-- Convert GitHub `blob` links to raw-file URLs for loading.
-- Use bracketed section labels and newline separators in chord progressions.
-- Responsive, non-scrolling piano displays that trim outer octaves on narrow screens.
+- Built-in *I Will Follow You Into the Dark* chord progression as the default example.
+- Automatic progression updates while typing and inline feedback listing chord tokens that could not be parsed.
+- Loading from a public URL or local chord-text file, including drag-and-drop; GitHub `blob` links are converted to raw-file URLs.
+- Bracketed section labels and unlabeled separators for progression line breaks.
+- Responsive piano displays that never scroll horizontally and trim outer octaves as space gets tight.
 - Sequence-wide voice-leading optimization for octave placement.
+- Distinct chord colors by root, quality, and slash-bass/inversion; repeats of the same chord voicing retain their color.
+- A favicon matching the page’s Lucide Music2 mark.
 
 ### Changed
-- Default voicings remain in root position; slash-chord notation explicitly specifies a different bass note.
+- Chords default to root position; slash-chord notation explicitly specifies a different bass note.
 - Removed the hero banner and finger-number recommendations for a more compact, keys-focused guide.
 - Refined chord labels, keyboard spacing, and octave controls.
 

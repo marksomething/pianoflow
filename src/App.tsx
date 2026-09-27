@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ChevronDown, Lightbulb, Minus, Music2, Plus } from 'lucide-react';
 import {
   arrangeProgression,
@@ -33,7 +33,7 @@ function colorAt(index: number): ChordColor {
   };
 }
 
-const example = 'C  G  Am  F  C  G  F  C';
+const example = 'Am  C  F  C  G/B\nAm  C  G\nAm  C  E  Am  Am/G  F  Fm  C/G';
 
 function normalizeFileUrl(value: string): string {
   const input = value.trim();
@@ -201,6 +201,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputTimerRef = useRef<number | null>(null);
   const notesByChord = useMemo(() => arrangeProgression(chords, octaveShifts), [chords, octaveShifts]);
   const colorByChord = useMemo(() => {
     const ids = [...new Set(chords.map((chord) => chord.id))];
@@ -208,7 +209,15 @@ function App() {
   }, [chords]);
   const uniqueCount = new Set(chords.map((chord) => chord.id)).size;
 
+  function clearInputTimer() {
+    if (inputTimerRef.current !== null) {
+      window.clearTimeout(inputTimerRef.current);
+      inputTimerRef.current = null;
+    }
+  }
+
   function applyChordText(value: string, warnSkipped = true): boolean {
+    clearInputTimer();
     const cleanValue = value.replace(/^\uFEFF/, '');
     setText(cleanValue);
     if (!cleanValue.trim()) {
@@ -219,18 +228,13 @@ function App() {
     }
     const result = parseChordList(cleanValue);
     if (result.chords.length === 0) {
-      setError(`I couldn't find any chords. Try symbols like C, Am, F#m7, or Bb.`);
+      setError(result.invalid.length ? `Couldn't parse any chords: ${result.invalid.join(', ')}` : `I couldn't find any chords. Try symbols like C, Am, F#m7, or Bb.`);
       return false;
     }
     setItems(result.items);
     setOctaveShifts(result.chords.map(() => 0));
-    setError(warnSkipped && result.invalid.length ? `Skipped unrecognized ${result.invalid.length === 1 ? 'chord' : 'chords'}: ${result.invalid.join(', ')}` : '');
+    setError(warnSkipped && result.invalid.length ? `Couldn't parse: ${result.invalid.join(', ')}` : '');
     return true;
-  }
-
-  function applyProgression(event: FormEvent) {
-    event.preventDefault();
-    applyChordText(text);
   }
 
   function loadExample() {
@@ -282,7 +286,7 @@ function App() {
     }
   }
 
-  function handleFileDrop(event: React.DragEvent<HTMLFormElement>) {
+  function handleFileDrop(event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     setIsDragging(false);
     const file = event.dataTransfer.files[0];
@@ -306,9 +310,8 @@ function App() {
       </header>
 
       <section className="progression-input-section" id="top">
-        <form
+        <div
           className={`input-panel ${isDragging ? 'dragging' : ''}`}
-          onSubmit={applyProgression}
           onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }}
           onDragLeave={(event) => {
             const next = event.relatedTarget;
@@ -321,13 +324,22 @@ function App() {
           <textarea
             id="chord-input"
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setText(value);
+              clearInputTimer();
+              inputTimerRef.current = window.setTimeout(() => {
+                inputTimerRef.current = null;
+                applyChordText(value);
+              }, 350);
+            }}
             placeholder="Try: C  G  Am  F"
             rows={2}
             spellCheck={false}
           />
+          {error && <p className={`form-message ${error.startsWith("Couldn't parse") ? 'warning' : ''}`} role="status">{error}</p>}
           <div className="input-bottom">
-            <span className="input-hint">{isDragging ? 'Drop the chord text file to load it' : 'Use [Verse] for a label; new lines add separators · drop a chord file to load it'}</span>
+            <span className="input-hint">{isDragging ? 'Drop the chord text file to load it' : 'Updates automatically · use [Verse] labels and new lines for breaks · drop a chord file to load it'}</span>
             <div className="input-actions">
               <div className="load-menu-wrap">
                 <button className="load-button" type="button" aria-expanded={loadMenuOpen} onClick={() => setLoadMenuOpen((open) => !open)}>
@@ -366,11 +378,9 @@ function App() {
                   />
                 </div>}
               </div>
-              <button className="show-button" type="submit">Show my chords <span aria-hidden="true">→</span></button>
             </div>
           </div>
-          {error && <p className={`form-message ${error.startsWith('Skipped') ? 'warning' : ''}`} role="status">{error}</p>}
-        </form>
+        </div>
       </section>
 
       <section className="guide-section" aria-label="Your piano chord guide">

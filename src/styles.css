@@ -41,7 +41,7 @@ h1, h2, h3, p { margin-top: 0; }
 .input-bottom { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-top: 1px solid #eff1ee; padding-top: 12px; }
 .input-hint { color: #9aa29f; font-size: 10px; }
 .input-actions { display: flex; align-items: center; gap: 12px; }
-.load-button, .show-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; cursor: pointer; font-size: 11px; font-weight: 700; }
+.load-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; cursor: pointer; font-size: 11px; font-weight: 700; }
 .load-menu-wrap { position: relative; }
 .load-button { padding: 9px 4px; color: #68766f; background: transparent; }
 .load-button:hover { color: var(--green); }
@@ -55,10 +55,7 @@ h1, h2, h3, p { margin-top: 0; }
 .load-url-button { width: 100%; margin-top: 7px; padding: 8px; border: 0; border-radius: 6px; color: white; background: #2c735f; cursor: pointer; font-size: 10px; font-weight: 700; }
 .load-url-button:disabled { opacity: .6; cursor: wait; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.show-button { padding: 10px 14px; color: white; background: #2c735f; border-radius: 7px; box-shadow: 0 3px 7px #286a5824; transition: background .15s, transform .15s; }
-.show-button:hover { background: #225d4d; transform: translateY(-1px); }
-.show-button span { font-size: 16px; font-weight: 400; line-height: 10px; }
-.form-message { margin: 10px 0 0; color: #a04d3a; font-size: 11px; text-align: left; }
+.form-message { margin: 0 0 10px; color: #a04d3a; font-size: 11px; text-align: left; }
 .form-message.warning { color: #8b6b27; }
 
 .guide-section { padding-top: 4px; }
@@ -67,9 +64,9 @@ h1, h2, h3, p { margin-top: 0; }
 .sequence-count { display: inline-flex; align-items: center; gap: 8px; color: #818b89; font-size: 10px; white-space: nowrap; }
 .sequence-count i { width: 3px; height: 3px; border-radius: 50%; background: #aeb6b1; }
 .progression-list { display: flex; flex-direction: column; gap: 13px; }
-.progression-section { display: flex; align-items: center; gap: 12px; padding: 1px 4px; color: #75827a; font-size: 10px; font-weight: 700; letter-spacing: .8px; }
-.progression-section::before, .progression-section::after { content: ''; flex: 1; height: 1px; background: #e1e7e0; }
-.progression-separator { height: 1px; margin: -1px 8px -4px; background: #e1e7e0; }
+.progression-section { display: flex; align-items: center; gap: 12px; padding: 3px 4px; color: #5d7164; font-size: 10px; font-weight: 700; letter-spacing: .8px; }
+.progression-section::before, .progression-section::after { content: ''; flex: 1; height: 2px; background: #c5d0c7; }
+.progression-separator { height: 2px; margin: 2px 8px 0; background: #b9c7bd; border-radius: 1px; }
 .chord-card { min-width: 0; padding: 7px 14px; overflow: hidden; background: #fff; border: 1px solid #e5e9e4; border-radius: 12px; box-shadow: 0 3px 8px #1b31220a; }
 .card-topline { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .step-marker { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; color: #a0aaa4; font: 600 9px 'Manrope', sans-serif; }
@@ -124,7 +121,6 @@ h1, h2, h3, p { margin-top: 0; }
   .input-panel { padding: 16px 14px 13px; }
   .input-bottom { align-items: flex-start; flex-direction: column; gap: 7px; }
   .input-actions { width: 100%; justify-content: space-between; }
-  .show-button { padding: 9px 11px; }
   .card-topline { gap: 9px; }
   .step-marker { flex-basis: 24px; width: 24px; height: 24px; }
   .chord-root { font-size: 15px; }
