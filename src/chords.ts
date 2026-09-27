@@ -8,7 +8,7 @@ export type Chord = {
   id: string;
 };
 
-export type LyricMarker = { chordIndex: number; column: number };
+export type LyricMarker = { chordIndex: number; column: number; inline?: boolean };
 
 export type ProgressionItem =
   | { type: 'section'; title: string }
@@ -109,6 +109,25 @@ export function parseChordSheet(input: string): { chords: Chord[]; items: Progre
     const sectionMatch = trimmed.match(/^\[([^\]]+)\]$/);
     if (sectionMatch && !parseChord(sectionMatch[1].trim())) {
       items.push({ type: 'section', title: sectionMatch[1].trim() });
+      pendingMarkers = [];
+      continue;
+    }
+
+    const inlineMatches = [...line.matchAll(/\[([^\]]+)\]/g)];
+    const inlineChords = inlineMatches.flatMap((match) => {
+      const chord = parseChord(match[1].trim());
+      return chord ? [{ chord, column: match.index ?? 0 }] : [];
+    });
+    const inlineLyrics = line.replace(/\[([^\]]+)\]/g, (full, symbol: string) => parseChord(symbol.trim()) ? ' '.repeat(full.length) : full).replace(/\s+$/, '');
+    if (inlineChords.length > 0 && inlineLyrics.trim()) {
+      const markers = [...pendingMarkers];
+      for (const item of inlineChords) {
+        const chordIndex = chords.length;
+        chords.push(item.chord);
+        items.push({ type: 'chord', chord: item.chord, chordIndex });
+        markers.push({ chordIndex, column: item.column, inline: true });
+      }
+      items.push({ type: 'lyrics', text: inlineLyrics, markers });
       pendingMarkers = [];
       continue;
     }

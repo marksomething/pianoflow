@@ -2,6 +2,15 @@
 
 Notable changes to PianoFlow are recorded here.
 
+## [1.2.0] - 2026-09-27
+
+### Added
+- Paste chord sheets with lyrics directly into the progression field, including line-paired and inline bracketed chord cues.
+- Group associated piano keyboards and lyrics inside a shared boundary, with colored chord numbers marking change points above the lyric words.
+
+### Changed
+- Retain the existing plain-progression parser and chord-token error reporting while auto-detecting pasted lyric sheets.
+
 ## [1.1.0] - 2026-09-27
 
 ### Added

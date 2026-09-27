@@ -46,7 +46,7 @@ C  G/B  Am  F
 F  C/E  G
 ```
 
-Use square brackets for section labels. In chord-text files, bracketed chord symbols such as `[C]` are also recognized. A token that cannot be parsed as a chord is reported beneath the progression field.
+Use square brackets for section labels. You can also paste a chord sheet with lyrics directly into the progression field. Chord rows and lyric rows are paired automatically; lyrics appear inside the same boundary as their piano keyboards, with small colored chord numbers above the words where changes occur. Inline cues such as `[C]Love of mine` are recognized too. A token that cannot be parsed as a chord is reported beneath the progression field.
 
 The built-in example is:
 

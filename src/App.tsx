@@ -246,7 +246,6 @@ function App() {
   const chords = useMemo(() => items.flatMap((item) => item.type === 'chord' ? [item.chord] : []), [items]);
   const [octaveShifts, setOctaveShifts] = useState<number[]>(initial.chords.map(() => 0));
   const [error, setError] = useState('');
-  const [lyricsMode, setLyricsMode] = useState(false);
   const [loadMenuOpen, setLoadMenuOpen] = useState(false);
   const [urlEntryOpen, setUrlEntryOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -296,18 +295,22 @@ function App() {
     if (!cleanValue.trim()) {
       setItems([]);
       setOctaveShifts([]);
-      setLyricsMode(false);
       setError('');
       return true;
     }
-    const result = warnSkipped ? parseChordList(cleanValue) : parseChordSheet(cleanValue);
+    const songSheet = parseChordSheet(cleanValue);
+    const hasLyricProse = songSheet.items.some((item) => item.type === 'lyrics' && (
+      item.text.trim().split(/\s+/).length > 1 || item.markers.some((marker) => marker.inline)
+    ));
+    const result = !warnSkipped || (songSheet.chords.length > 0 && hasLyricProse)
+      ? songSheet
+      : parseChordList(cleanValue);
     if (result.chords.length === 0) {
       setError(result.invalid.length ? `Couldn't parse any chords: ${result.invalid.join(', ')}` : `I couldn't find any chords. Try symbols like C, Am, F#m7, or Bb.`);
       return false;
     }
     setItems(result.items);
     setOctaveShifts(result.chords.map(() => 0));
-    setLyricsMode(result.items.some((item) => item.type === 'lyrics'));
     setError(warnSkipped && result.invalid.length ? `Couldn't parse: ${result.invalid.join(', ')}` : '');
     return true;
   }
@@ -405,7 +408,7 @@ function App() {
               clearInputTimer();
               inputTimerRef.current = window.setTimeout(() => {
                 inputTimerRef.current = null;
-                applyChordText(value, !lyricsMode);
+                applyChordText(value);
               }, 350);
             }}
             placeholder="Try: C  G  Am  F"
@@ -414,7 +417,7 @@ function App() {
           />
           {error && <p className={`form-message ${error.startsWith("Couldn't parse") ? 'warning' : ''}`} role="status">{error}</p>}
           <div className="input-bottom">
-            <span className="input-hint">{isDragging ? 'Drop the chord text file to load it' : 'Updates automatically · use [Verse] labels and new lines for breaks · drop a chord file to load it'}</span>
+            <span className="input-hint">{isDragging ? 'Drop the chord text file to load it' : 'Paste chord-and-lyric sheets · use [Verse] labels · new lines add breaks'}</span>
             <div className="input-actions">
               <div className="load-menu-wrap">
                 <button className="load-button" type="button" aria-expanded={loadMenuOpen} onClick={() => setLoadMenuOpen((open) => !open)}>
