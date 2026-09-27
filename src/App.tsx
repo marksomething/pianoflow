@@ -6,6 +6,7 @@ import {
   parseChordList,
   suggestedFingers,
   type Chord,
+  type ProgressionItem,
 } from './chords';
 
 type Hand = 'right' | 'left';
@@ -58,7 +59,7 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
   const noteLabel = (midi: number) => noteName(midi);
   return (
     <div className="keyboard-scroll" role="img" tabIndex={0} aria-label={`88-key piano with ${notes.map(noteLabel).join(', ')} highlighted`}>
-      <svg className="piano-svg" viewBox={`0 0 ${width} 116`} style={{ minWidth: `${width}px` }}>
+      <svg className="piano-svg" viewBox={`0 0 ${width} 86`} style={{ minWidth: `${width}px` }}>
         <g>
           {whiteKeys.map(({ midi, x }) => {
             const finger = active.get(midi);
@@ -68,15 +69,15 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
             return (
               <g key={midi}>
                 <rect
-                  x={x + 0.5} y="1" width={whiteWidth - 1} height="112" rx="2"
+                  x={x + 0.5} y="1" width={whiteWidth - 1} height="82" rx="2"
                   fill={isActive ? color.pale : '#fff'}
                   stroke={isActive ? color.line : '#d9dfe3'} strokeWidth="1"
                 />
                 {isActive && <>
-                  <circle cx={x + whiteWidth / 2} cy="71" r="9" fill={color.main} />
-                  <text x={x + whiteWidth / 2} y="74.5" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>
+                  <circle cx={x + whiteWidth / 2} cy="57" r="8" fill={color.main} />
+                  <text x={x + whiteWidth / 2} y="60.5" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>
                 </>}
-                {showLabel && <text x={x + whiteWidth / 2} y="104" textAnchor="middle" className={`key-label ${isActive ? 'key-label-active' : ''}`} fill={isActive ? color.ink : '#89939a'}>{noteLabel(midi)}</text>}
+                {showLabel && <text x={x + whiteWidth / 2} y="78" textAnchor="middle" className={`key-label ${isActive ? 'key-label-active' : ''}`} fill={isActive ? color.ink : '#89939a'}>{noteLabel(midi)}</text>}
               </g>
             );
           })}
@@ -88,11 +89,11 @@ function Keyboard({ notes, fingers, color }: { notes: number[]; fingers: number[
             return (
               <g key={midi}>
                 <rect
-                  x={x} y="1" width={blackWidth} height="70" rx="2.5"
+                  x={x} y="1" width={blackWidth} height="46" rx="2.5"
                   fill={isActive ? color.main : '#27323a'}
                   stroke={isActive ? color.ink : '#27323a'} strokeWidth="1"
                 />
-                {isActive && <text x={x + blackWidth / 2} y="40" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>}
+                {isActive && <text x={x + blackWidth / 2} y="27" textAnchor="middle" className="finger-number" fill="#fff">{finger || '·'}</text>}
               </g>
             );
           })}
@@ -121,55 +122,50 @@ function ChordCard({
 }) {
   const fingers = suggestedFingers(notes, hand, chord.rootPc, chord.intervals);
   const displayNotes = notes.map(noteName);
-  const octaveText = octaveShift === 0 ? 'Middle position' : `${octaveShift > 0 ? '+' : ''}${octaveShift} octave${Math.abs(octaveShift) === 1 ? '' : 's'}`;
+  const bassPc = notes.length ? notes[0] % 12 : chord.rootPc;
+  const originalSlashBass = chord.source.split('/')[1];
+  const bassName = chord.slashPc === bassPc && originalSlashBass
+    ? originalSlashBass
+    : noteName(notes[0] ?? chord.rootPc + 60).replace(/\d+$/, '');
+  const bassSuffix = bassPc === chord.rootPc ? '' : `/${bassName}`;
 
   return (
     <article className="chord-card" style={{ '--chord-pale': color.pale, '--chord-main': color.main, '--chord-ink': color.ink, '--chord-line': color.line } as React.CSSProperties}>
       <div className="card-topline">
-        <div className="step-marker" style={{ background: color.pale, color: color.ink, borderColor: color.line }}>{String(index + 1).padStart(2, '0')}</div>
+        <div className="step-marker" aria-label={`Chord ${index + 1}`}>{String(index + 1).padStart(2, '0')}</div>
         <div className="chord-title-wrap">
           <div className="chord-title-line">
-            <h2>{chord.source}</h2>
-            <span className="quality-tag">{chord.quality}</span>
+            <div className="chord-identity">
+              <span className="chord-root">{chord.root}{bassSuffix}</span>
+              <span className="quality-tag">{chord.quality}</span>
+            </div>
+            <p className="chord-note-summary">Play <strong>{displayNotes.join(' · ')}</strong></p>
           </div>
-          <p className="chord-note-summary">Play <strong>{displayNotes.join(' · ')}</strong></p>
         </div>
-        <div className="octave-controls" aria-label={`Adjust ${chord.source} octave`}>
-          <span className="octave-caption">OCTAVE</span>
-          <div className="octave-control-row">
-            <button type="button" className="step-button" onClick={() => onShift(-1)} disabled={octaveShift <= -2} aria-label={`Move ${chord.source} down one octave`}><Minus size={14} /></button>
-            <span className="octave-value">{octaveShift === 0 ? '0' : `${octaveShift > 0 ? '+' : ''}${octaveShift}`}</span>
-            <button type="button" className="step-button" onClick={() => onShift(1)} disabled={octaveShift >= 2} aria-label={`Move ${chord.source} up one octave`}><Plus size={14} /></button>
+        <div className="card-side-controls">
+          <div className="octave-controls" aria-label={`Adjust ${chord.source} octave`}>
+            <span className="octave-caption">OCTAVE</span>
+            <div className="octave-control-row">
+              <button type="button" className="step-button" onClick={() => onShift(-1)} disabled={octaveShift <= -2} aria-label={`Move ${chord.source} down one octave`}><Minus size={14} /></button>
+              <span className="octave-value">{octaveShift === 0 ? '0' : `${octaveShift > 0 ? '+' : ''}${octaveShift}`}</span>
+              <button type="button" className="step-button" onClick={() => onShift(1)} disabled={octaveShift >= 2} aria-label={`Move ${chord.source} up one octave`}><Plus size={14} /></button>
+            </div>
           </div>
-          <span className="octave-position">{octaveText}</span>
         </div>
       </div>
 
       <Keyboard notes={notes} fingers={fingers} color={color} />
 
-      <div className="card-footer">
-        <div className="finger-guide">
-          <span className="footer-label">SUGGESTED {hand === 'right' ? 'RIGHT' : 'LEFT'} HAND</span>
-          <div className="finger-chips">
-            {notes.map((note, noteIndex) => (
-              <span className="finger-chip" key={`${note}-${noteIndex}`}>
-                <b style={{ background: color.main }}>{fingers[noteIndex] ?? '·'}</b>
-                <span>{noteName(note)}</span>
-              </span>
-            ))}
-          </div>
-        </div>
-        <span className="position-note">{hand === 'right' ? '1 = thumb' : '1 = thumb'} <span>·</span> {displayNotes.length > 5 ? 'Consider splitting across both hands' : 'Move as one shape'}</span>
-      </div>
     </article>
   );
 }
 
 function App() {
-  const initial = parseChordList(example).chords;
+  const initial = parseChordList(example);
   const [text, setText] = useState(example);
-  const [chords, setChords] = useState<Chord[]>(initial);
-  const [octaveShifts, setOctaveShifts] = useState<number[]>(initial.map(() => 0));
+  const [items, setItems] = useState<ProgressionItem[]>(initial.items);
+  const chords = useMemo(() => items.flatMap((item) => item.type === 'chord' ? [item.chord] : []), [items]);
+  const [octaveShifts, setOctaveShifts] = useState<number[]>(initial.chords.map(() => 0));
   const [hand, setHand] = useState<Hand>('right');
   const [error, setError] = useState('');
   const notesByChord = useMemo(() => arrangeProgression(chords, octaveShifts), [chords, octaveShifts]);
@@ -182,7 +178,7 @@ function App() {
   function applyProgression(event: FormEvent) {
     event.preventDefault();
     if (!text.trim()) {
-      setChords([]);
+      setItems([]);
       setOctaveShifts([]);
       setError('');
       return;
@@ -192,22 +188,23 @@ function App() {
       setError(`I couldn't read any chords. Try symbols like C, Am, F#m7, or Bb.`);
       return;
     }
-    setChords(result.chords);
+    setItems(result.items);
     setOctaveShifts(result.chords.map(() => 0));
     setError(result.invalid.length ? `Skipped unrecognized ${result.invalid.length === 1 ? 'chord' : 'chords'}: ${result.invalid.join(', ')}` : '');
   }
 
   function loadExample() {
     setText(example);
-    const parsed = parseChordList(example).chords;
-    setChords(parsed);
-    setOctaveShifts(parsed.map(() => 0));
+    const parsed = parseChordList(example);
+    setItems(parsed.items);
+    setOctaveShifts(parsed.chords.map(() => 0));
     setError('');
   }
 
   function shiftOctave(index: number, direction: number) {
     setOctaveShifts((current) => current.map((value, i) => i === index ? Math.max(-2, Math.min(2, value + direction)) : value));
   }
+
 
   return (
     <main className="app-shell">
@@ -236,7 +233,7 @@ function App() {
             spellCheck={false}
           />
           <div className="input-bottom">
-            <span className="input-hint">Try C, Am7, F#m, Bb, or C/G · separate with spaces or commas</span>
+            <span className="input-hint">Use C/G for an explicit inversion; [Verse] labels and new lines add separators</span>
             <div className="input-actions">
               <button className="example-button" type="button" onClick={loadExample}><RotateCcw size={14} /> Load example</button>
               <button className="show-button" type="submit">Show my chords <span aria-hidden="true">→</span></button>
@@ -266,18 +263,22 @@ function App() {
           <div className="empty-state"><Music2 size={22} /><h3>Your guide will appear here</h3><p>Add a few chord names above to build your piano map.</p></div>
         ) : (
           <div className="progression-list">
-            {chords.map((chord, index) => (
-              <ChordCard
-                key={`${chord.source}-${index}`}
-                chord={chord}
-                index={index}
-                notes={notesByChord[index] ?? []}
-                color={colorByChord.get(chord.id) ?? palette[0]}
-                hand={hand}
-                octaveShift={octaveShifts[index] ?? 0}
-                onShift={(direction) => shiftOctave(index, direction)}
-              />
-            ))}
+            {items.map((item, index) => {
+              if (item.type === 'section') return <div className="progression-section" key={`section-${index}`}><span>{item.title}</span></div>;
+              if (item.type === 'separator') return <div className="progression-separator" key={`separator-${index}`} aria-hidden="true" />;
+              return (
+                <ChordCard
+                  key={`${item.chord.source}-${item.chordIndex}`}
+                  chord={item.chord}
+                  index={item.chordIndex}
+                  notes={notesByChord[item.chordIndex] ?? []}
+                  color={colorByChord.get(item.chord.id) ?? palette[0]}
+                  hand={hand}
+                  octaveShift={octaveShifts[item.chordIndex] ?? 0}
+                  onShift={(direction) => shiftOctave(item.chordIndex, direction)}
+                />
+              );
+            })}
           </div>
         )}
       </section>
@@ -288,7 +289,7 @@ function App() {
           <h3>A couple of things to know</h3>
           <p><strong>Matching colors mean matching chords.</strong> Your hand moves to a new position for each row; keep the notes in that chord pressed together.</p>
           <p><strong>Finger numbers are suggestions:</strong> 1 is your thumb and 5 is your pinky. They’re a simple starting point, not a strict rule. Use the octave buttons if a shape feels more comfortable higher or lower.</p>
-          <p className="method-note">The starting position is near middle C, then each chord is placed as close as possible to the one before it. Suggested fingerings use a basic one-hand chord pattern.</p>
+          <p className="method-note">Chords start in root position near middle C. Use slash chords like C/G to specify a different bass note; other chords are placed as close as possible to the previous shape. Suggested fingerings are basic one-hand starting points.</p>
         </div>
       </section>
 

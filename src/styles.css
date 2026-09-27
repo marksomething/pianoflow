@@ -20,7 +20,7 @@ html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; }
 button, textarea { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, a:focus-visible, textarea:focus-visible, .keyboard-scroll:focus-visible { outline: 2px solid #4d9278; outline-offset: 3px; }
+button:focus-visible, a:focus-visible, textarea:focus-visible, select:focus-visible, .keyboard-scroll:focus-visible { outline: 2px solid #4d9278; outline-offset: 3px; }
 
 .app-shell { width: min(1220px, calc(100% - 64px)); margin: 0 auto; }
 .site-header { height: 76px; display: flex; align-items: center; border-bottom: 1px solid #e8ebe6; }
@@ -39,7 +39,7 @@ h1 { margin: 20px 0 12px; color: #202c30; font: 800 clamp(39px, 5vw, 58px)/1.09 
 h1 span { color: #43856d; }
 .hero-copy { max-width: 515px; margin: 0 auto 29px; color: #788287; font-size: 15px; line-height: 1.7; }
 .input-panel { padding: 19px 20px 15px; background: #fff; border: 1px solid #e3e8e2; border-radius: 13px; box-shadow: 0 10px 30px #203a2510; text-align: left; }
-.input-panel label, .footer-label { display: block; color: #8a9493; font-size: 9px; font-weight: 700; letter-spacing: 1.25px; }
+.input-panel label { display: block; color: #8a9493; font-size: 9px; font-weight: 700; letter-spacing: 1.25px; }
 .input-panel textarea { display: block; width: 100%; min-height: 57px; margin: 10px 0 8px; padding: 8px 0; resize: vertical; border: 0; outline: none; color: #2a393b; background: transparent; font: 600 20px/1.55 'Manrope', sans-serif; letter-spacing: .1px; }
 .input-panel textarea::placeholder { color: #b1bbb7; font-weight: 500; }
 .input-bottom { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-top: 1px solid #eff1ee; padding-top: 12px; }
@@ -66,36 +66,32 @@ h1 span { color: #43856d; }
 .sequence-count { display: inline-flex; align-items: center; gap: 8px; padding-bottom: 8px; color: #818b89; font-size: 10px; white-space: nowrap; }
 .sequence-count i { width: 3px; height: 3px; border-radius: 50%; background: #aeb6b1; }
 .progression-list { display: flex; flex-direction: column; gap: 13px; }
-.chord-card { min-width: 0; padding: 17px 19px 0; overflow: hidden; background: #fff; border: 1px solid #e5e9e4; border-radius: 12px; box-shadow: 0 3px 8px #1b31220a; }
-.card-topline { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.step-marker { display: grid; flex: 0 0 34px; width: 34px; height: 34px; place-items: center; border: 1px solid; border-radius: 10px; font: 700 10px 'Manrope', sans-serif; }
+.progression-section { display: flex; align-items: center; gap: 12px; padding: 1px 4px; color: #75827a; font-size: 10px; font-weight: 700; letter-spacing: .8px; }
+.progression-section::before, .progression-section::after { content: ''; flex: 1; height: 1px; background: #e1e7e0; }
+.progression-separator { height: 1px; margin: -1px 8px -4px; background: #e1e7e0; }
+.chord-card { min-width: 0; padding: 7px 14px; overflow: hidden; background: #fff; border: 1px solid #e5e9e4; border-radius: 12px; box-shadow: 0 3px 8px #1b31220a; }
+.card-topline { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.step-marker { display: grid; flex: 0 0 24px; width: 24px; height: 24px; place-items: center; color: #a0aaa4; font: 600 9px 'Manrope', sans-serif; }
 .chord-title-wrap { min-width: 0; }
-.chord-title-line { display: flex; align-items: center; gap: 9px; }
-.chord-title-line h2 { margin: 0; color: #273438; font: 750 20px 'Manrope', sans-serif; letter-spacing: -.4px; }
-.quality-tag { padding: 3px 7px; color: var(--chord-ink); background: var(--chord-pale); border-radius: 5px; font-size: 9px; font-weight: 600; }
-.chord-note-summary { margin: 3px 0 0; color: #8a9493; font-size: 10px; }
+.chord-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+.chord-identity { display: inline-flex; align-items: baseline; gap: 5px; padding: 2px 6px; color: var(--chord-ink); background: var(--chord-pale); border: 1px solid var(--chord-line); border-radius: 6px; white-space: nowrap; }
+.chord-root { font: 700 16px 'Manrope', sans-serif; letter-spacing: -.3px; }
+.quality-tag { color: inherit; font-size: 11px; font-weight: 600; }
+.chord-note-summary { margin: 0; color: #8a9493; font-size: 10px; white-space: nowrap; }
 .chord-note-summary strong { color: #586763; font-weight: 600; }
-.octave-controls { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-left: auto; padding-left: 10px; }
+.card-side-controls { display: flex; flex: 0 0 auto; align-items: center; margin-left: auto; }
+.octave-controls { display: flex; align-items: center; gap: 8px; }
 .octave-caption { color: #9ba39f; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .octave-control-row { display: flex; align-items: center; gap: 8px; }
 .step-button { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid #e5e9e5; border-radius: 6px; color: #63716b; background: white; cursor: pointer; }
 .step-button:not(:disabled):hover { border-color: var(--chord-line); color: var(--chord-ink); background: var(--chord-pale); }
 .step-button:disabled { opacity: .35; cursor: default; }
 .octave-value { min-width: 17px; color: #53625c; text-align: center; font-size: 11px; font-weight: 700; }
-.octave-position { color: #a1aaa6; font-size: 8px; }
 .keyboard-scroll { width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-color: #d3dad3 #f5f6f3; scrollbar-width: thin; }
 .piano-svg { display: block; width: 100%; height: auto; }
 .finger-number { font: 700 9px 'DM Sans', sans-serif; pointer-events: none; }
 .key-label { font: 500 7px 'DM Sans', sans-serif; }
 .key-label-active { font-weight: 700; }
-.card-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 47px; margin-top: 0; border-top: 1px solid #eff1ed; }
-.finger-guide { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.footer-label { flex: 0 0 auto; font-size: 8px; letter-spacing: .8px; }
-.finger-chips { display: flex; align-items: center; gap: 7px; }
-.finger-chip { display: inline-flex; align-items: center; gap: 4px; color: #697570; font-size: 9px; white-space: nowrap; }
-.finger-chip b { display: grid; width: 16px; height: 16px; place-items: center; border-radius: 50%; color: white; font-size: 9px; }
-.position-note { color: #9aa39f; font-size: 9px; white-space: nowrap; }
-.position-note span { padding: 0 3px; }
 .empty-state { display: grid; justify-items: center; padding: 56px 20px; color: #8b9890; border: 1px dashed #dce3dc; border-radius: 12px; background: #fbfcf9; text-align: center; }
 .empty-state svg { margin-bottom: 13px; color: #60947e; }
 .empty-state h3 { margin: 0 0 5px; color: #4c5d55; font: 700 16px 'Manrope', sans-serif; }
@@ -119,7 +115,7 @@ h1 span { color: #43856d; }
   .guide-heading { align-items: flex-start; flex-direction: column; gap: 14px; }
   .guide-tools { width: 100%; justify-content: space-between; align-items: center; }
   .sequence-count { padding-bottom: 0; }
-  .chord-card { padding: 14px 14px 0; }
+  .chord-card { padding: 7px 12px; }
   .keyboard-scroll { margin-left: -1px; width: calc(100% + 2px); }
 }
 
@@ -136,17 +132,11 @@ h1 span { color: #43856d; }
   .guide-heading h2 { font-size: 22px; }
   .guide-heading p { max-width: 295px; line-height: 1.5; }
   .card-topline { gap: 9px; }
-  .step-marker { flex-basis: 29px; width: 29px; height: 29px; border-radius: 8px; }
-  .chord-title-line h2 { font-size: 18px; }
-  .quality-tag { font-size: 8px; }
-  .octave-controls { padding-left: 2px; }
-  .position-note { display: none; }
-  .card-footer { min-height: 44px; }
-  .finger-guide { gap: 8px; }
-  .footer-label { max-width: 72px; line-height: 1.3; }
-  .finger-chips { gap: 5px; }
-  .finger-chip { gap: 3px; font-size: 8px; }
-  .finger-chip b { width: 15px; height: 15px; }
+  .step-marker { flex-basis: 24px; width: 24px; height: 24px; }
+  .chord-root { font-size: 15px; }
+  .quality-tag { font-size: 9px; }
+  .octave-control-row { gap: 5px; }
+  .chord-card { padding: 7px 12px; }
   .how-section { gap: 10px; padding: 16px 13px; }
   .how-icon { flex-basis: 29px; width: 29px; height: 29px; }
   .site-footer { margin-top: 27px; }

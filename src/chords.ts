@@ -8,6 +8,11 @@ export type Chord = {
   id: string;
 };
 
+export type ProgressionItem =
+  | { type: 'section'; title: string }
+  | { type: 'separator' }
+  | { type: 'chord'; chord: Chord; chordIndex: number };
+
 const pitchClasses: Record<string, number> = {
   C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, Fb: 4, 'E#': 5, F: 5,
   'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11, Cb: 11, 'B#': 0,
@@ -81,52 +86,77 @@ export function parseChord(source: string): Chord | undefined {
   };
 }
 
-export function parseChordList(input: string): { chords: Chord[]; invalid: string[] } {
-  const tokens = input.split(/[\s,|;→]+/).filter(Boolean);
+export function parseChordList(input: string): { chords: Chord[]; items: ProgressionItem[]; invalid: string[] } {
+  const tokens = input.matchAll(/\[[^\]]*\]|[^\s,|;→]+/g);
   const chords: Chord[] = [];
+  const items: ProgressionItem[] = [];
   const invalid: string[] = [];
-  for (const token of tokens) {
+  let previousTokenEnd = 0;
+  let previousTokenWasSection = false;
+  let hasPreviousToken = false;
+  for (const match of tokens) {
+    const token = match[0];
+    const tokenStart = match.index ?? 0;
+    const isSection = token.startsWith('[') && token.endsWith(']');
+    const gap = input.slice(previousTokenEnd, tokenStart);
+    if (hasPreviousToken && /[\r\n]/.test(gap) && !previousTokenWasSection && !isSection) {
+      items.push({ type: 'separator' });
+    }
+    previousTokenEnd = tokenStart + token.length;
+    previousTokenWasSection = isSection;
+    hasPreviousToken = true;
+    if (isSection) {
+      const title = token.slice(1, -1).trim();
+      if (title) items.push({ type: 'section', title });
+      else invalid.push(token);
+      continue;
+    }
     const chord = parseChord(token);
-    if (chord) chords.push(chord);
-    else invalid.push(token);
+    if (chord) {
+      const chordIndex = chords.length;
+      chords.push(chord);
+      items.push({ type: 'chord', chord, chordIndex });
+    } else {
+      invalid.push(token);
+    }
   }
-  return { chords, invalid };
+  return { chords, items, invalid };
 }
 
-function inversionPatterns(chord: Chord): number[][] {
+function inversionPatterns(chord: Chord, inversionIndex: number): number[][] {
   const source = chord.intervals;
-  const patterns: number[][] = [];
-  const starts = chord.slashPc === undefined
-    ? source.map((_, i) => i)
-    : source.map((_, i) => i).filter((i) => (chord.rootPc + source[i]) % 12 === chord.slashPc);
+  const start = ((inversionIndex % source.length) + source.length) % source.length;
+  const rotated = source.slice(start).concat(source.slice(0, start));
+  const pattern: number[] = [];
+  let previous = Number.NEGATIVE_INFINITY;
+  for (const interval of rotated) {
+    let note = interval;
+    while (note <= previous) note += 12;
+    pattern.push(note);
+    previous = note;
+  }
 
-  if (starts.length > 0) {
-    for (const start of starts) {
-      const rotated = source.slice(start).concat(source.slice(0, start).map((n) => n + 12));
-      patterns.push(rotated);
-    }
-  } else {
-    // A non-chord slash bass is included as a lower note so the requested bass is still visible.
-    const bassOffset = ((chord.slashPc! - chord.rootPc + 12) % 12);
-    const signedBass = bassOffset > 6 ? bassOffset - 12 : bassOffset;
-    patterns.push([signedBass, ...source].sort((a, b) => a - b));
+  if (chord.slashPc !== undefined && !source.some((interval) => (chord.rootPc + interval) % 12 === chord.slashPc)) {
+    // A non-chord slash bass stays below the selected chord inversion.
+    const bassOffset = (chord.slashPc - chord.rootPc + 12) % 12;
+    const bassBelowRoot = bassOffset === 0 ? 0 : bassOffset - 12;
+    pattern.push(bassBelowRoot);
   }
-  if (chord.slashPc === undefined) {
-    for (let start = 0; start < source.length; start++) {
-      patterns.push(source.slice(start).concat(source.slice(0, start).map((n) => n + 12)));
-    }
-  }
-  const unique = new Map<string, number[]>();
-  for (const pattern of patterns) unique.set(pattern.join(','), pattern);
-  return [...unique.values()];
+  return [pattern.sort((a, b) => a - b)];
 }
 
-function chordCandidates(chord: Chord): number[][] {
+export function defaultInversionIndex(chord: Chord): number {
+  if (chord.slashPc === undefined) return 0;
+  const index = chord.intervals.findIndex((interval) => (chord.rootPc + interval) % 12 === chord.slashPc);
+  return index < 0 ? 0 : index;
+}
+
+function chordCandidates(chord: Chord, inversionIndex: number): number[][] {
   const rootMidi = Array.from({ length: 25 }, (_, i) => 48 + i)
     .filter((midi) => midi % 12 === chord.rootPc)
     .sort((a, b) => Math.abs(a - 60) - Math.abs(b - 60))[0];
   const candidates: number[][] = [];
-  for (const pattern of inversionPatterns(chord)) {
+  for (const pattern of inversionPatterns(chord, inversionIndex)) {
     for (let octave = -3; octave <= 3; octave++) {
       const notes = pattern.map((interval) => rootMidi + interval + octave * 12).sort((a, b) => a - b);
       if (notes.every((note) => note >= 21 && note <= 108)) candidates.push(notes);
@@ -147,7 +177,7 @@ export function arrangeProgression(chords: Chord[], octaveShifts: number[]): num
   let previous: number[] | undefined;
   return chords.map((chord, index) => {
     const targetOctaveShift = (octaveShifts[index] ?? 0) * 12;
-    const candidates = chordCandidates(chord).filter((candidate) => candidate.every((note) => note + targetOctaveShift >= 21 && note + targetOctaveShift <= 108));
+    const candidates = chordCandidates(chord, defaultInversionIndex(chord)).filter((candidate) => candidate.every((note) => note + targetOctaveShift >= 21 && note + targetOctaveShift <= 108));
     if (candidates.length === 0) return [];
     let selected = candidates[0];
     let bestScore = Number.POSITIVE_INFINITY;
